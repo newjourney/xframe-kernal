@@ -21,7 +21,10 @@ public class ModularAdapter implements ModuleLoader {
 	}
 	
 	public void runInject(Injector injector, Object bean, Player player) {
-		injector.inject(bean, player.mc);
+	    runInjectStatic(injector, bean, player);
+	}
+	public static final void runInjectStatic(Injector injector, Object bean, Player player) {
+	    injector.inject(bean, player.mc);
 	}
 	
 	public int indexOf(Class<?> moduleCls) {
@@ -29,7 +32,11 @@ public class ModularAdapter implements ModuleLoader {
 	}
 	
 	public <T> T loadModule(Player player, int moduleIndex) {
-		return player.mc.getBean(moduleIndex);
+		return loadModuleStatic(player, moduleIndex);
+	}
+	
+	public static final <T> T loadModuleStatic(Player player, int moduleIndex) {
+	    return player.mc.getBean(moduleIndex);
 	}
 	
 	@Override

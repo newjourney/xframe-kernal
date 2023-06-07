@@ -1,42 +1,38 @@
 package dev.xframe.game.cmd;
 
-import dev.xframe.game.action.Action;
-import dev.xframe.game.action.ActionBuilder;
+import dev.xframe.game.action.ActionFactory;
+import dev.xframe.game.action.ActionTask;
+import dev.xframe.game.action.Actions;
+import dev.xframe.game.action.Actor;
 import dev.xframe.game.player.Player;
-import dev.xframe.inject.beans.BeanHelper;
-import dev.xframe.net.codec.IMessage;
-import dev.xframe.utils.XCaught;
 
-public final class ActionCmd<T extends Player> extends DirectCmd<T>  {
+public final class ActionCmd<T extends Player, M> extends DirectCmd<T, M>  {
 
-    final Class<?> actionCls;
-    final ActionBuilder builder;
-    final LiteParser msgParser;
-    
+    final Class<?> cls;
+    final ActionFactory fac;
+    final ActorGetter acg;
+
     public ActionCmd(Class<?> cls) {
-        try {
-            BeanHelper.inject(this);
-            this.actionCls = cls;
-            this.builder = ActionBuilder.of(cls);
-            this.msgParser = new LiteParser(cls, Action.class, "M");
-        } catch (Throwable e) {
-            throw XCaught.throwException(e);
-        }
+        this.cls = cls;
+        this.fac = Actions.getFactoryByCls(cls);
+        this.acg = ActorGetter.from(cls);
     }
-    
+
     @Override
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public void exec(T player, IMessage req) throws Exception {
-        Action<T, Object> action = builder.build(player);
-        //transfer msg
-        Object msg = msgParser.parse(req.getBody());
-        //run action (looped)
-        player.accept(action, msg);
+    protected Class<?> getExplicitCls() {
+        return ActorGetter.getMsgCls(cls);
     }
-    
+
+    @Override
+    public void exec(T player, M msg) throws Exception {
+        Actor actor = acg.get(player, msg);
+        //run action (looped)
+        ActionTask.of(fac.make(actor), actor, msg).checkin();
+    }
+
     @Override
     public Class<?> getClazz() {
-        return actionCls;
+        return cls;
     }
 
 }

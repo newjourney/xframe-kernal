@@ -30,10 +30,7 @@ public final class GameConfigurator implements Loadable {
 
 	@Override
 	public void load() {
-		Class<?> assemble = Codes.getScannedClasses().stream().filter(c->c.isAnnotationPresent(Assemble.class)).findAny().orElse(null);
-		if (assemble != null) {
-			configure(assemble);
-		}
+		Codes.getScannedClasses(clz -> clz.isAnnotationPresent(Assemble.class)).stream().findAny().ifPresent(this::configure);
 	}
 
 	private TaskExecutor newExecutor(Class<?> assemble) {
@@ -43,7 +40,6 @@ public final class GameConfigurator implements Loadable {
 		return anno.sharding() ? TaskExecutors.newSharding(name, nThreads) : TaskExecutors.newFixed(name, nThreads);
 	}
 
-	@SuppressWarnings("unchecked")
 	private void configure(Class<?> assemble) {
 		modularAdapter.initial(assemble);
 		
@@ -58,10 +54,11 @@ public final class GameConfigurator implements Loadable {
 	}
 
 	private PlayerFactory newPlayerFactory(Class<?> assemble) {
-		PlayerFactory factory = XLambda.createByConstructor(PlayerFactory.class, assemble, long.class, TaskLoop.class);
+		final ModularAdapter _adapter = modularAdapter;
+		final PlayerFactory  _factory = XLambda.createByConstructor(PlayerFactory.class, assemble, long.class, TaskLoop.class);
 		return (long playerId, TaskLoop loop) -> {
-					Player player = factory.newPlayer(playerId, loop);
-					modularAdapter.assemble(player);
+					Player player = _factory.newPlayer(playerId, loop);
+					_adapter.assemble(player);
 					return player;
 				};
 	}

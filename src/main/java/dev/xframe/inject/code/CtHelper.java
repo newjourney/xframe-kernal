@@ -2,6 +2,8 @@ package dev.xframe.inject.code;
 
 import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import dev.xframe.utils.XCaught;
 import dev.xframe.utils.XReflection;
@@ -46,6 +48,13 @@ public class CtHelper {
     public static CtConstructor copy(CtConstructor src, String body, CtClass declaring) throws CannotCompileException, NotFoundException {
         return CtNewConstructor.make(src.getParameterTypes(), src.getExceptionTypes(), body, declaring);
     }
+    
+    public static String wrapParams(int len) {
+        return wrapParams(len, 0);
+    }
+    public static String wrapParams(int len, int skip) {
+        return String.join(",", IntStream.rangeClosed(skip + 1, len).mapToObj(i->"$"+i).collect(Collectors.toList()));
+    }
 
     public static boolean isObjectType(CtClass clazz) {
         return Object.class.getName().equals(clazz.getName());
@@ -57,6 +66,22 @@ public class CtHelper {
 
     public static boolean isDefault(CtMethod method) {
         return ((method.getModifiers() & (Modifier.ABSTRACT | Modifier.PUBLIC | Modifier.STATIC)) == Modifier.PUBLIC) && method.getDeclaringClass().isInterface();
+    }
+    
+    public static boolean isStatic(CtMethod method) {
+        return (method.getModifiers() & Modifier.STATIC) > 0;
+    }
+    
+    /**
+     * define class before gen class
+     */
+    public static Class<?> defineClass(String clsName) {
+        try {
+            return Class.forName(clsName);
+        } catch (ClassNotFoundException e) {
+            //ignore
+            return null;
+        }
     }
 
 }

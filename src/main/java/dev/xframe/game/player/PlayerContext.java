@@ -1,17 +1,16 @@
 package dev.xframe.game.player;
 
+import dev.xframe.game.action.Runnable;
+import dev.xframe.task.Task;
+import dev.xframe.task.TaskExecutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import dev.xframe.game.action.RunnableAction;
-import dev.xframe.task.Task;
-import dev.xframe.task.TaskExecutor;
 
 
 /**
@@ -21,7 +20,7 @@ import dev.xframe.task.TaskExecutor;
 @SuppressWarnings("unchecked")
 public class PlayerContext {
     
-    private Logger logger = LoggerFactory.getLogger(PlayerContext.class);
+    private final Logger logger = LoggerFactory.getLogger(PlayerContext.class);
     
     private final PlayerCollection players;
     
@@ -33,81 +32,79 @@ public class PlayerContext {
 		return id->new PlayerData(factory.newPlayer(id, executor.newLoop()));
 	}
 	
-	private void handleIncorrentId(long playerId) {
-		logger.error("Incorrect player: [{}]", playerId);
+	private void logIncorrent(long id) {
+		logger.error("Incorrect player: [{}]", id);
 	}
-	private void handleLoadError(long playerId) {
-		logger.error("Load player [{}] error", playerId);
-		players.remove(playerId);
+	private Player doLoad(Player player) {
+	    try {
+	        player.load();
+	        return player;
+	    } catch (Throwable e) {
+	        long id = player.id();
+	        players.remove(id);
+            logger.error(String.format("Load player [%s] error", id), e);
+        }
+	    return null;
 	}
 	
-    public <T extends Player> T getPlayerExists(long playerId) {
-        if(playerId < 1) {
-            handleIncorrentId(playerId);
+    public <T extends Player> T getPlayerExists(long id) {
+        if(id < 1) {
+            logIncorrent(id);
             return null;
         }
-        return (T) players.get(playerId);
+        return (T) players.get(id);
     }
     
     public <T extends Player> T getPlayer(long playerId) {
         if(playerId < 1) {
-            handleIncorrentId(playerId);
+            logIncorrent(playerId);
             return null;
         }
         return (T) players.get(playerId);
     }
 
-    public <T extends Player> T getPlayerImmediately(long playerId) {
-        if(playerId < 1) {
-            handleIncorrentId(playerId);
+    public <T extends Player> T getPlayerImmediately(long id) {
+        if(id < 1) {
+            logIncorrent(id);
             return null;
         }
-        Player player = players.getOrNew(playerId);
-        if(!player.load()) {
-            handleLoadError(playerId);
-            return null;
-        }
-        return (T) player;
+        return (T) doLoad(players.getOrNew(id));
     }
 
-    public <T extends Player> T getPlayerWithLoad(long playerId) {
-        if(playerId < 1) {
-            handleIncorrentId(playerId);
+    public <T extends Player> T getPlayerWithLoad(long id) {
+        if(id < 1) {
+            logIncorrent(id);
             return null;
         }
-        Player player = players.getOrNew(playerId);
+        Player player = players.getOrNew(id);
         //通过playerTask Load数据
         new Task(player.loop()) {
             @Override
             protected void exec() {
-                if(!player.load()) {
-                    handleLoadError(playerId);
-                }
+                doLoad(player);
             }
         }.checkin();
         return (T) player;
     }
     
-    public <T extends Player> T getPlayerWithLatch(long playerId, CountDownLatch latch) {
-        if(playerId < 1) {
+    public <T extends Player> T getPlayerWithLatch(long id, CountDownLatch latch) {
+        if(id < 1) {
             latch.countDown();
             return null;
         }
-        Player tmp = players.get(playerId);
+        Player tmp = players.get(id);
         if(tmp != null) {
             latch.countDown();
             return (T) tmp;
         }
-        final Player player = players.getOrNew(playerId);
+        final Player player = players.getOrNew(id);
         //不存在缓存中, 从DB中load
         //通过player.loop Load数据
         new Task(player.loop()) {
             @Override
             protected void exec() {
                 try {
-                    if(!player.load()) {
-                        handleLoadError(playerId);
-                    }
+                    doLoad(player);
                 } finally {
                     latch.countDown();
                 }
@@ -116,8 +113,8 @@ public class PlayerContext {
         return (T) player;
     }
     
-    public boolean exists(long playerId) {
-        return players.isExist(playerId);
+    public boolean exists(long id) {
+        return players.isExist(id);
     }
     
     /**
@@ -138,7 +135,7 @@ public class PlayerContext {
                     removePlayer(player);
                 }
             } catch (Exception ex) {
-                logger.error("persistence players", ex);
+                logger.error("Persistence players", ex);
             }
         }
     }
@@ -167,7 +164,7 @@ public class PlayerContext {
         	this.factory = factory;
 		}
         public Player get(long playerId) {
-            PlayerData item = (PlayerData) datas.get(playerId);
+            PlayerData item = datas.get(playerId);
             if(item == null) {
                 return null;
             }
@@ -219,38 +216,38 @@ public class PlayerContext {
         }
     }
 
-    public <T extends Player> void callPlayer(long id, RunnableAction<T> rAction) {
+    public <T extends Player> void callPlayer(long id, Runnable<T> rAction) {
         T player = (T) players.get(id);
         if(player != null) {
         	execCall(rAction, player);
         }
     }
 
-    public <T extends Player> void callOnlinePlayers(RunnableAction<T> rAction) {
+    public <T extends Player> void callOnlinePlayers(Runnable<T> rAction) {
         for (PlayerData data : players.datas()) {
         	execCall(rAction, data, true);
         }
     }
 
-    public <T extends Player> void callAllPlayers(RunnableAction<T> rAction) {
+    public <T extends Player> void callAllPlayers(Runnable<T> rAction) {
         for (PlayerData data : players.datas()) {
         	execCall(rAction, data, false);
         }
     }
     
-    private <T extends Player> void execCall(RunnableAction<T> rAction, PlayerData data, boolean onlineRequired) {
+    private <T extends Player> void execCall(Runnable<T> rAction, PlayerData data, boolean onlineRequired) {
     	T player;
     	if(data != null && (player = (T) data.getData()) != null && (!onlineRequired || player.isOnline())) {
     	    execCall(rAction, player);
     	}
     }
     
-	private <T extends Player> void execCall(RunnableAction<T> rAction, T player) {
+	private <T extends Player> void execCall(Runnable<T> rAction, T player) {
 		try {
 		    player.accept(rAction);
 		} catch (Throwable e) {
 			logger.error("Call player throws: ", e);
-		}
+        }
 	}
 	
 }

@@ -1,69 +1,44 @@
 package dev.xframe.game.player;
 
-import dev.xframe.game.action.Action;
-import dev.xframe.game.action.ActionTask;
-import dev.xframe.game.action.EmptyMsg;
+import dev.xframe.game.action.Actor;
 import dev.xframe.game.module.ModuleType;
 import dev.xframe.game.module.beans.ModuleContainer;
 import dev.xframe.task.TaskLoop;
 
-public abstract class Player {
+public abstract class Player extends Actor {
 
-	private TaskLoop loop;
-	private long id;
     private int loaded;
     //set by player factory
     ModuleContainer mc;
     
     public Player(long id, TaskLoop loop) {
-        this.id = id;
-        this.loop = loop;
+        super(id, loop);
     }
     
-    public long id() {
-    	return id;
-    }
-    public TaskLoop loop() {
-        return this.loop;
-    }
-    
-    //EmptyMsg Action
-    public <T extends Player> void accept(Action<T, EmptyMsg> action) {
-        accept(action, EmptyMsg.Instance);
-    }
-    @SuppressWarnings("unchecked")
-    public <T extends Player, M> void accept(Action<T, M> action, M msg) {
-        T player = (T) this;
-        if(loop.inLoop()) {
-            ActionTask.exec(action, player, msg);
-        } else {
-            ActionTask.of(action, player, msg).checkin();
-        }
-    }
-    
-    public synchronized boolean load(ModuleType type) {
+    public synchronized void load(ModuleType type) {
     	this.mc.loadModules(type);
     	this.loaded |= type.code;
-        return true;
     }
     
-    public synchronized boolean unload(ModuleType type) {
+    public synchronized void unload(ModuleType type) {
     	this.mc.unloadModules(type);
     	this.loaded &= ~type.code;
-        return true;
     }
     
-    public boolean save() {
+    public void save() {
 		this.mc.saveModules();
-        return true;
+    }
+    
+    public void tick() {
+        this.mc.tickModules();
     }
     
     public final boolean isLoaded(ModuleType type) {
         return (loaded & type.code) > 0;
     }
     
-    public final boolean load() {
-        return this.load(ModuleType.RESIDENT);
+    public final void load() {
+        this.load(ModuleType.RESIDENT);
     }
     
     public final boolean idle(long lastActiveTime) {

@@ -47,7 +47,7 @@ public class ModuleContainer extends BeanContainer  {
 	protected void loadBeanExec(BeanBinder binder, Object bean) {
 		super.loadBeanExec(binder, bean);
 		ModularBinder mbinder = (ModularBinder)binder;
-        mbinder.getInvoker().invokeLoad(this);
+        mbinder.getInvoker().invokeLoad(this, bean);
 		mbinder.onLoaded(this, bean);
 	}
 
@@ -67,7 +67,7 @@ public class ModuleContainer extends BeanContainer  {
     private void unloadModule(ModularBinder binder) {
         int bIndex = binder.getIndex();
         Object ex = this.getBean(bIndex);
-        binder.getInvoker().invokeUnload(this);
+        binder.getInvoker().invokeUnload(this, ex);
         //清空Container中的ref
         this.setBean(bIndex, null);
         this.setFlag(bIndex, false);
@@ -81,9 +81,19 @@ public class ModuleContainer extends BeanContainer  {
 	}
 	private void saveModules(ModularBinder[] binders) {
 		for (ModularBinder binder : binders) {
-			binder.getInvoker().invokeSave(this);//异常在ModularInvoker已经捕获
+			binder.getInvoker().invokeSave(this, getBean(binder.getIndex()));//异常在ModularInvoker已经捕获
 		}
 	}
+	
+	public void tickModules() {
+	    tickModules(((ModularIndexes)indexes).residents);
+	    tickModules(((ModularIndexes)indexes).transients);
+    }
+    private void tickModules(ModularBinder[] binders) {
+        for (ModularBinder binder : binders) {
+            binder.getInvoker().invokeTick(this, getBean(binder.getIndex()));//异常在ModularInvoker已经捕获
+        }
+    }
 	
 	public boolean isModuleLoaded(int index) {
 		return getFlag(index);

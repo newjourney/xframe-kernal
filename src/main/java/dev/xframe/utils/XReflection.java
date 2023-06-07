@@ -1,5 +1,9 @@
 package dev.xframe.utils;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.SerializedLambda;
 import java.lang.reflect.AccessibleObject;
@@ -36,13 +40,28 @@ public class XReflection extends SecurityManager {
         int len = classes.length;
         return len > index ? classes[index] : classes[len - 1];
     }
-    
-    
+
+    /**
+     * get resource in classpath or as file
+     * @param res
+     * @return
+     */
+    public static InputStream getResourceAsStream(String res) {
+        InputStream input = Thread.currentThread().getContextClassLoader().getResourceAsStream(res);
+        if(input == null) {
+            File f = new File(res);
+            if(f.exists()) {
+                try {
+                    input = new FileInputStream(f);
+                } catch (FileNotFoundException e) {}//ignore
+            }
+        }
+        return input;
+    }
+
     /**
      * @param cls
-     * @param name
-     * @param parameterTypes
-     * @return method
+     * @param predicate
      */
     public static List<Method> getMethods(Class<?> cls, Predicate<Method> predicate) {
         return getMethods0(cls, predicate, new ArrayList<>());
@@ -51,10 +70,9 @@ public class XReflection extends SecurityManager {
         if(cls == null) {
             return dest;
         }
-        Method res = null;
         for (Method m : cls.getDeclaredMethods()) {
             if (predicate.test(m)) {
-                XReflection.setAccessible(res);
+                XReflection.setAccessible(m);
                 dest.add(m);
             }
         }
@@ -155,7 +173,6 @@ public class XReflection extends SecurityManager {
     }
 
     /**
-     * @param <T>
      * @param clazz
      * @param parameterTypes
      * @return declared constructor
@@ -183,6 +200,21 @@ public class XReflection extends SecurityManager {
         return invokeConstructor(getConstructor(clazz));
     }
 
+    public static MethodHandle findGetter(Class<?> refc, String name, Class<?> type) {
+        try {
+            return XLookup.lookup().findGetter(refc, name, type);
+        } catch (Exception e) {
+            throw XCaught.throwException(e);
+        }
+    }
+    public static MethodHandle findSetter(Class<?> refc, String name, Class<?> type) {
+        try {
+            return XLookup.lookup().findSetter(refc, name, type);
+        } catch (Exception e) {
+            throw XCaught.throwException(e);
+        }
+    }
+    
     /**
      * 获取Class.isAssignableFrom为true的所有类
      */

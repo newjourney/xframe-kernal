@@ -1,11 +1,10 @@
 package dev.xframe.test.game;
 
-import org.junit.Assert;
-
 import dev.xframe.event.Subscribe;
 import dev.xframe.game.module.Module;
 import dev.xframe.game.module.ModuleType;
 import dev.xframe.inject.Inject;
+import org.junit.Assert;
 
 @Module(ModuleType.RESIDENT)
 public class TPlayerInventory implements TInventory, TSharablePlayer, TAgent {
@@ -41,6 +40,11 @@ public class TPlayerInventory implements TInventory, TSharablePlayer, TAgent {
     @Override
     public boolean dox() {
         return false;
+    }
+
+    @TCallerAnno
+    public int callmodule(int x) {
+        return (int) Math.pow(x, 2);
     }
 
 }
